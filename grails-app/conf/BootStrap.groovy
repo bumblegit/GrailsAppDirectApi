@@ -5,7 +5,7 @@ class BootStrap {
     def init = { servletContext ->
 
         final SHOW_PRINTS = false
-        final CREATE_TEST_DATA = true
+        final CREATE_TEST_DATA = false
 
         environments {
             production {
