@@ -53,6 +53,7 @@ class SubscriptionController extends RestfulController{
         def users = buildUsers(subscription)
         subscription = buildSubscription(marketplace, account, company, creator, users, subscription)
 
+
         //Authorization and fetch the data
 
         /*Result creation*/
