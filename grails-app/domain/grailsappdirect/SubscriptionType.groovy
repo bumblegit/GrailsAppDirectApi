@@ -1,0 +1,13 @@
+package grailsappdirect
+
+public enum SubscriptionType {
+    SUBSCRIPTION_ORDER("SUBSCRIPTION_ORDER"), SUBSCRIPTION_CHANGE("SUBSCRIPTION_CHANGE"),
+    SUBSCRIPTION_CANCEL("SUBSCRIPTION_CANCEL"), SUBSCRIPTION_NOTICE("SUBSCRIPTION_NOTICE"),
+    USER_ASSIGNMENT("USER_ASSIGNMENT"), USER_UNASSIGNMENT ("USER_UNASSIGNMENT ")
+
+    String id
+
+    SubscriptionType(String id) {
+        this.id = id
+    }
+}
