@@ -3,6 +3,8 @@ package grailsappdirect
 import grails.converters.XML
 import grails.rest.RestfulController
 import grails.transaction.Transactional
+import org.codehaus.groovy.grails.plugins.codecs.HTMLCodec
+
 import static org.springframework.http.HttpStatus.*
 import org.scribe.model.Token
 import uk.co.desirableobjects.oauth.scribe.OauthService
@@ -30,14 +32,11 @@ class SubscriptionController extends RestfulController{
     }
 
     /*
-    Test for action:
-        curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST -d "" http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2Frest%2Fapi%2Fevents%2F12345
-
     URL's
     In AppDirect configuration:
         http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl={eventUrl}
     In GrailsAppDirect
-        http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2Frest%2Fapi%2Fevents%2F12345
+        http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyOrder
 
     Error codes for order subscriptions:
         -UNAUTHORIZED: This error code is returned when users try any action that is not authorized for that particular application. For example, if an application does not allow the original creator to be unassigned.
@@ -48,19 +47,35 @@ class SubscriptionController extends RestfulController{
         * Not implemented yet
     * */
 
+    /*
+    Test for action:
+    curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST -d "" http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyOrder
+    */
+
     @Transactional
     def save() {
         println "WS Create!!!"
 
-        /* Get the URL param */
+        /* URL Implementation */
 
-        String eventUrl
+        String eventUrlEncode
 
-        /*TODO use the following convention
-        "https%3A%2F%2Fwww.appdirect.com%2Frest%2Fapi%2Fevents%2F12345"
-        eventUrl = params.eventUrl
-        */
-        eventUrl = "https://www.appdirect.com/AppDirect/rest/api/events/dummyOrder"
+        eventUrlEncode = params.eventUrl
+
+        if (eventUrlEncode == null || eventUrlEncode.isEmpty()) {
+            Result result = new Result()
+            result.success = false
+            result.errorCode = ErrorCode.UNKNOWN_ERROR
+            result.message = "Subscription NOT created!. eventUrl param is empty or null"
+            respond result, [status: OK]
+            request.withFormat {
+                xml { render result as XML }
+            }
+            return
+        }
+
+        String eventUrl = URLDecoder.decode(eventUrlEncode, "UTF-8")
+        println "eventUrlDecoded: $eventUrl"
 
         final String tokenLastMarkReplacement = "/"
         final String tokenEmptyMarkReplacement = ""
