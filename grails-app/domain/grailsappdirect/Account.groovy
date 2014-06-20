@@ -8,7 +8,7 @@ class Account {
     static belongsTo = [subscription: Subscription]
 
     static constraints = {
-        identifier nullable: false, blank: false
+        identifier nullable: true, blank: true
         status nullable: false, blank: false, inList: AccountStatus.values().toList()
     }
 

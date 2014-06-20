@@ -119,8 +119,8 @@ log4j.main = {
 /*OAuth configuration*/
 oauth {
     providers {
-        appDirect {
-            api = AppDirectApiJava
+        appdirect {
+            api = AppDirectApi
             key = 'Dummy'
             secret = 'secret'
         }

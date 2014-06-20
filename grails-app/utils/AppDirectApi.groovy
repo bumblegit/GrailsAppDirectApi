@@ -18,12 +18,12 @@ import java.util.regex.Pattern
 
 class AppDirectApi extends DefaultApi20 {
 
-    final String AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=%s&redirect_uri=%s"
+    final String AUTHORIZE_URL = "https://accounts.AppDirect.com/o/oauth2/auth?response_type=code&client_id=%s&redirect_uri=%s"
     final String SCOPED_AUTHORIZE_URL = AUTHORIZE_URL + "&scope=%s"
 
     @Override
     public String getAccessTokenEndpoint() {
-        return "https://accounts.google.com/o/oauth2/token"
+        return "https://accounts.AppDirect.com/o/oauth2/token"
     }
 
     @Override
@@ -64,16 +64,16 @@ class AppDirectApi extends DefaultApi20 {
 
     @Override
     public OAuthService createService(OAuthConfig config) {
-        return new GoogleOAuth2Service(this, config);
+        return new AppDirectOAuth2Service(this, config);
     }
 
-    private class GoogleOAuth2Service extends OAuth20ServiceImpl {
+    private class AppDirectOAuth2Service extends OAuth20ServiceImpl {
         private static final String GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code"
         private static final String GRANT_TYPE = "grant_type"
         private DefaultApi20 api
         private OAuthConfig config
 
-        public GoogleOAuth2Service(DefaultApi20 api, OAuthConfig config) {
+        public AppDirectOAuth2Service(DefaultApi20 api, OAuthConfig config) {
             super(api, config)
             this.api = api
             this.config = config
