@@ -8,6 +8,7 @@ class Subscription {
     SubscriptionType subscriptionType
     Marketplace marketplace
     Company company
+    Order order
     Account account
     Creator creator
     Notice notice
@@ -22,6 +23,8 @@ class Subscription {
         marketplace nullable: false
         creator nullable: false
         company nullable: true
+        //I can set it as not null when I'll use it.
+        order nullable: true
         account nullable: true
         users nullable: true
         notice nullable: true, inList: Notice.values().toList()

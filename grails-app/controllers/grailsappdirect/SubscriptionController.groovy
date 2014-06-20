@@ -51,20 +51,8 @@ class SubscriptionController extends RestfulController{
     @Transactional
     def save() {
         println "WS Create!!!"
-        Subscription subscription = new Subscription()
 
-            /*we need to parse the XML and fetch it into Subscription's objects */
-            /*Build for coming subscription. Once twe have de response for the call to appdirect data,*/
-            Marketplace marketplace = buildMarketplace()
-            Company company = buildCompany()
-            Creator creator = buildCreator()
-            Account account = buildAccount()
-            def users = buildUsers(subscription)
-            subscription = buildSubscription(marketplace, account, company, creator, users, subscription)
-
-        /* Authorization and fetch the data */
-
-        //Get the URL param
+        /* Get the URL param */
 
         String eventUrl
 
@@ -88,6 +76,7 @@ class SubscriptionController extends RestfulController{
         Token token = new Token(tokenStr, "secret")
 
         /*TODO if is not a valid authorization, then return SC_UNAUTHORIZED(401) respond*/
+        /*Authorization and response*/
 
         def response = oauthService.getAppdirectResource(token, eventUrl)
 
@@ -100,17 +89,69 @@ class SubscriptionController extends RestfulController{
         def creatorNode = eventNode.creator
         def marketplaceNode = eventNode.marketplace
         def payloadNode = eventNode.payload
-        def returnUrlNode = eventNode.returnUrl
+        def companyNode = payloadNode.company
+        def orderNode = payloadNode.order
+        //def returnUrlNode = eventNode.returnUrl
         def typeNode = eventNode.type
 
-        println "Email: "+creatorNode.email.text()
-        println "Partner: "+marketplaceNode.partner.text()
-        println "URL: "+returnUrlNode.text()
-        println "Type: "+typeNode.text()
+        /*** Subscription ***/
 
-        /*Result creation*/
+        Subscription subscription = new Subscription()
+        String typeNodeText = typeNode.text()
+        subscription.subscriptionType = SubscriptionType.valueOf(typeNodeText)
+
+        /*** Creator ***/
+
+        Creator creator = new Creator()
+        creator.email = creatorNode.email.text()
+        creator.firstName = creatorNode.firstName.text()
+        creator.lastName = creatorNode.lastName.text()
+        creator.lang = creatorNode.language.text()
+        creator.openId = creatorNode.openId.text()
+        creator.uuid = creatorNode.uuid.text()
+        creator.subscriptionCreator = subscription
+
+        /*** Marketplace ***/
+
+        Marketplace marketplace = new Marketplace()
+        marketplace.partner = marketplaceNode.partner.text()
+        marketplace.baseUrl = marketplaceNode.baseUrl.text()
+        marketplace.subscription = subscription
+
+        /*** Payload ***/
+
+        //Company
+        Company company = new Company()
+        company.country = companyNode.country.text()
+        company.email = companyNode.email.text()
+        company.name = companyNode.name.text()
+        company.uuid = companyNode.uuid.text()
+        company.phoneNumber = companyNode.phoneNumber.text()
+        company.website = companyNode.website.text()
+        company.subscription = subscription
+
+        //Order
+        Order order = new Order()
+        order.editionCode = orderNode.editionCode.text()
+        order.pricingDuration = orderNode.pricingDuration.text()
+        orderNode.item.findAll{
+            OrderItem item = new OrderItem()
+            item.quantity = it.quantity.text() as Integer
+            item.unit = it.unit.text()
+            item.order = order
+            order.addToItems(item)
+        }
+        order.subscription = subscription
+
+        /*** Subscription assignments***/
+
+        subscription.creator = creator
+        subscription.marketplace = marketplace
+        subscription.company = company
+        subscription.order = order
+
+        /* Result creation */
         Result result = new Result()
-
 
         /*TODO adapt with the real subscription*/
         if (subscription == null || subscription.hasErrors()) {
@@ -119,18 +160,19 @@ class SubscriptionController extends RestfulController{
             result.message = "Subscription NOT created!"
         }
 
+        /*Prints for subscription built */
         println "create - subscription: "
-        println " -account: "+subscription.marketplace.partner
+        println " -marketplace: "+subscription.marketplace.partner
         println " -creator: "+subscription.creator.firstName+" "+subscription.creator.lastName
-        println " -account: "+subscription.account.identifier
         println " -company: "+subscription.company.name
-        println " -users: "
-        subscription.users.each {
-            println "   -user: $it.openId"
+        println " -Order: $subscription.order.editionCode"
+        subscription.order.items.each {
+            println "   -item-unit: $it.unit"
+            println "   -item-quantity: $it.quantity"
+            println "----------"
         }
 
-        boolean subscriptionSaved = subscription.save(flush: true, failOnError:true);
-        //boolean subscriptionSaved = false
+        boolean subscriptionSaved = subscription.save(flush: true, failOnError:true) as boolean;
 
         if (subscriptionSaved) {
             result.success = true
@@ -139,12 +181,12 @@ class SubscriptionController extends RestfulController{
             result.accountIdentifier = subscription.company.uuid
             result.message = "Subscription CREATED!"
             //Respond with code 200
-            respond subscription, [status: OK]
+            respond result, [status: OK]
         } else {
             result.success = false
             result.errorCode = 300
             result.message = "Subscription NOT created!"
-            respond subscription, [status: OK]
+            respond result, [status: OK]
             /*According to AppDirect documentation, we should always return a HTTPStatus 200
             * The differences are in the errorCode
             * */
@@ -159,49 +201,46 @@ class SubscriptionController extends RestfulController{
         request.withFormat {
             xml { render result as XML }
         }
+        respond result, [status: OK]
 
     }
 
-   def edit(Subscription subscriptionInstance) {
-        respond subscriptionInstance
-    }
-
-    @Transactional
-    //Take in mind code 200
-    def update(Subscription subscriptionInstance) {
-        println "WS Update!!"
-        if (subscriptionInstance == null) {
-            notFound()
-            return
-        }
-
-        if (subscriptionInstance.hasErrors()) {
-            respond subscriptionInstance.errors, view: 'edit'
-            return
-        }
-
-        subscriptionInstance.save flush: true
-
-    }
-
-    //curl -i -X DELETE http://localhost:8080/GrailsAppDirect/api/subscriptions/17
+    //curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/subscriptions/6
     //Take in mind code 200
     @Transactional
     def delete(Subscription subscriptionInstance) {
         println "WS Delete!!"
 
+        /* Result creation */
+        Result result = new Result()
+
         if (subscriptionInstance == null) {
-            notFound()
-            return
+            respond subscriptionInstance, [status: NOT_FOUND]
         }
 
-        subscriptionInstance.delete flush: true
+        boolean subscriptionDeleted = subscriptionInstance.delete(flush: true, failOnError:true) as boolean;
 
-        '*' { render status: NO_CONTENT }
-    }
+        if (subscriptionDeleted) {
+            result.success = true
+            result.errorCode = null
+            //We are going to use the company's UUID as accountIdentifier. We will have it available for future events
+            result.accountIdentifier = subscription.company.uuid
+            result.message = "Subscription DELETED!"
+            //Respond with code 200
+            respond result, [status: OK]
+        } else {
+            result.success = false
+            result.errorCode = 300
+            result.message = "Subscription NOT deleted!"
+            respond result, [status: OK]
+            /*According to AppDirect documentation, we should always return a HTTPStatus 200
+            * The differences are in the errorCode
+            * */
+        }
 
-    protected void notFound() {
-        '*' { render status: NO_CONTENT }
+        request.withFormat {
+            xml { render subscriptionInstance as XML }
+        }
     }
 
     /*TEST DATA*/
