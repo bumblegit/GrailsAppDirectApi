@@ -1,47 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-    <meta charset="utf-8" />
-    <title>Dashboard - GrailsAppDirectTest</title>
-
-    <meta name="description" content="overview &amp; stats" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-
-    <!-- bootstrap & fontawesome -->
-    <link rel="stylesheet" href="../css/bootstrap.min.css" />
-    <link rel="stylesheet" href="../css/font-awesome.min.css" />
-
-    <!-- page specific plugin styles -->
-
-    <!-- text fonts -->
-    <link rel="stylesheet" href="../css/ace-fonts.css" />
-
-    <!-- ace styles -->
-    <link rel="stylesheet" href="../css/ace.min.css" />
-
-    <!--[if lte IE 9]>
-			<link rel="stylesheet" href="../css/ace-part2.min.css" />
-            <link rel="stylesheet" href="../css/ace-ie.min.css" />
-		<![endif]-->
-    <!--
-		<link rel="stylesheet" href="/../css/ace-skins.min.css" />
-		<link rel="stylesheet" href="/../css/ace-rtl.min.css" />
-        -->
-    <!-- inline styles related to this page -->
-
-    <!-- ace settings handler -->
-    <script src="js/ace-extra.min.js"></script>
-
-    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
-
-    <!--[if lte IE 8]>
-		<script src="js/html5shiv.js"></script>
-		<script src="js/respond.min.js"></script>
-		<![endif]-->
-</head>
-
-<body class="no-skin">
 <!-- #section:basics/navbar.layout -->
 <div id="navbar" class="navbar navbar-default">
 <script type="text/javascript">
@@ -66,7 +22,7 @@
     <a href="#" class="navbar-brand">
         <small>
             <i class="fa fa-leaf"></i>
-            GrailsAppDirectTest
+            GPlanningBoard
         </small>
     </a>
 
@@ -211,7 +167,7 @@
         <!-- #section:basics/navbar.user_menu -->
         <li class="light-blue">
             <a data-toggle="dropdown" href="#" class="dropdown-toggle">
-                <img class="nav-user-photo" src="avatars/user.jpg" alt="Jason's Photo" />
+                <img class="nav-user-photo" src="../avatars/user.jpg" alt="Jason's Photo" />
                 <span class="user-info">
                     <small>Welcome,</small>
                     Jason
@@ -647,54 +603,28 @@
 
 <!--[if !IE]> -->
 <script type="text/javascript">
-    window.jQuery || document.write("<script src='js/jquery.min.js'>"+"<"+"/script>");
+    window.jQuery || document.write("<script src='../js/jquery.min.js'>"+"<"+"/script>");
 </script>
 
 <!-- <![endif]-->
 
 <!--[if IE]>
 <script type="text/javascript">
- window.jQuery || document.write("<script src='js/jquery1x.min.js'>"+"<"+"/script>");
+ window.jQuery || document.write("<script src='../js/jquery1x.min.js'>"+"<"+"/script>");
 </script>
 <![endif]-->
 <script type="text/javascript">
-    if('ontouchstart' in document.documentElement) document.write("<script src='js/jquery.mobile.custom.min.js'>"+"<"+"/script>");
+    if('ontouchstart' in document.documentElement) document.write("<script src='../js/jquery.mobile.custom.min.js'>"+"<"+"/script>");
 </script>
-<script src="js/bootstrap.min.js"></script>
+<script src="../js/bootstrap.min.js"></script>
 
 <!-- page specific plugin scripts -->
 
 <!--[if lte IE 8]>
-		  <script src="js/excanvas.min.js"></script>
+		  <script src="../js/excanvas.min.js"></script>
 		<![endif]-->
-<script src="js/jquery-ui.custom.min.js"></script>
-
-<!--
-        <script src="/js/jquery.ui.touch-punch.min.js"></script>
-		<script src="/js/jquery.easypiechart.min.js"></script>
-		<script src="/js/jquery.sparkline.min.js"></script>
-		<script src="/js/flot/jquery.flot.min.js"></script>
-		<script src="/js/flot/jquery.flot.pie.min.js"></script>
-		<script src="/js/flot/jquery.flot.resize.min.js"></script>
-        -->
+<script src="../js/jquery-ui.custom.min.js"></script>
 
 <!-- ace scripts -->
-<script src="js/ace-elements.min.js"></script>
-<script src="js/ace.min.js"></script>
-
-<!--
-
-        <link rel="stylesheet" href="/../css/ace.onpage-help.css" />
-        <link rel="stylesheet" href="../docs/assets/js/themes/sunburst.css" />
-
-        <script type="text/javascript"> ace.vars['base'] = '..'; </script>
-        <script src="/js/ace/ace.onpage-help.js"></script>
-        <script src="../docs/assets/js/rainbow.js"></script>
-        <script src="../docs/assets/js/language/generic.js"></script>
-        <script src="../docs/assets/js/language/html.js"></script>
-        <script src="../docs/assets/js/language/css.js"></script>
-        <script src="../docs/assets/js/language/javascript.js"></script>
-        -->
-
-</body>
-</html>
+<script src="../js/ace-elements.min.js"></script>
+<script src="../js/ace.min.js"></script>

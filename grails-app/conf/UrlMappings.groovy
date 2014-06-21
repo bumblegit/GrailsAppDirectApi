@@ -7,7 +7,7 @@ class UrlMappings {
             }
         }
 
-        "/"(view:"/index")
+        "/"(controller:'login', action:"/index")
         "500"(view:'/error')
         "/api/subscriptions" (resources: 'subscription')
         "/api/subscriptions/*" (resources: 'subscription/*')

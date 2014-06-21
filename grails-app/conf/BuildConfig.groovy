@@ -71,6 +71,7 @@ grails.project.dependency.resolution = {
         compile ":rest-client-builder:2.0.1"
         compile ":oauth:2.5"
         compile ":rest:0.8"
+        compile ":openid:0.4.4"
 
         // plugins needed at runtime but not for compilation
         runtime ":hibernate4:4.3.5.3" // or ":hibernate:3.6.10.15"
