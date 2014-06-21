@@ -83,14 +83,14 @@ class AppDirectApi extends DefaultApi20 {
         public Token getAccessToken(Token requestToken, Verifier verifier) {
             OAuthRequest request = new OAuthRequest(api.getAccessTokenVerb(), api.getAccessTokenEndpoint())
             switch (api.getAccessTokenVerb()) {
-                case POST:
+                case Verb.POST:
                     request.addBodyParameter(OAuthConstants.CLIENT_ID, config.getApiKey())
                     request.addBodyParameter(OAuthConstants.CLIENT_SECRET, config.getApiSecret())
                     request.addBodyParameter(OAuthConstants.CODE, verifier.getValue())
                     request.addBodyParameter(OAuthConstants.REDIRECT_URI, config.getCallback())
                     request.addBodyParameter(GRANT_TYPE, GRANT_TYPE_AUTHORIZATION_CODE)
                     break;
-                case GET:
+                case Verb.GET:
                 default:
                     request.addQuerystringParameter(OAuthConstants.CLIENT_ID, config.getApiKey())
                     request.addQuerystringParameter(OAuthConstants.CLIENT_SECRET, config.getApiSecret())

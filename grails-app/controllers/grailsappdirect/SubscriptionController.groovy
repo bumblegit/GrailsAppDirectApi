@@ -3,11 +3,13 @@ package grailsappdirect
 import grails.converters.XML
 import grails.rest.RestfulController
 import grails.transaction.Transactional
+import groovyx.net.http.URIBuilder
+import org.scribe.model.Response
 import org.scribe.model.Token
+import org.scribe.model.Verifier
 import uk.co.desirableobjects.oauth.scribe.OauthService
 
-import static org.springframework.http.HttpStatus.NOT_FOUND
-import static org.springframework.http.HttpStatus.OK
+import static org.springframework.http.HttpStatus.*
 
 @Transactional(readOnly = true)
 class SubscriptionController extends RestfulController {
@@ -15,6 +17,7 @@ class SubscriptionController extends RestfulController {
     static allowedMethods = [save: "POST", update: "PUT", delete: "DELETE"]
 
     final String URL_ENCODING = "UTF-8"
+    final boolean TEST_MODE = true
 
     OauthService oauthService
 
@@ -32,8 +35,7 @@ class SubscriptionController extends RestfulController {
     }
 
     /*
-    curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST -d "" http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyOrder
-    */
+curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST -d "" http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyOrder%3Foauth_signature%3DIBlWhOm3PuDwaSdxE%2FQu4RKPtVE%3D    */
 
     @Transactional
     def save() {
@@ -46,9 +48,16 @@ class SubscriptionController extends RestfulController {
         String eventUrl = URLDecoder.decode(params.eventUrl as String, URL_ENCODING)
         println "eventUrlDecoded: $eventUrl"
 
-        Token token = getToken(eventUrl)
+        /*TODO implement STATELESS for dummy orders:
+        *
+        * http://info.appdirect.com/developers/docs/publication_and_maintenance/api_uptime_monitoring
+        *
+        * */
 
-        Subscription subscription = parseResponseInSubscription(token, eventUrl)
+        Token requestToken = getRequestToken(eventUrl)
+        String oAuthSignature = getOAuthSignature(eventUrl)
+
+        Subscription subscription = parseResponseInSubscription(requestToken, eventUrl, oAuthSignature)
 
         boolean isValidSubscriptionBuilt = validateSubscriptionBuilt as boolean
         if (!isValidSubscriptionBuilt) {return}
@@ -94,7 +103,7 @@ class SubscriptionController extends RestfulController {
         }
     }
 
-    private def getToken = {eventUrl ->
+    private def getRequestToken = {eventUrl ->
         final String tokenLastMarkReplacement = "/"
         final String tokenEmptyMarkReplacement = ""
 
@@ -111,6 +120,17 @@ class SubscriptionController extends RestfulController {
         return token
     }
 
+    private def getOAuthSignature = {eventUrl ->
+
+        URIBuilder uriBuilder = new URIBuilder(eventUrl as String)
+
+        String oauthSignatureParam = uriBuilder.query.oauth_signature
+
+        println "oauthSignatureParam: $oauthSignatureParam"
+
+        return oauthSignatureParam
+    }
+
     private def validateEventUrl = {eventUrl ->
         if (eventUrl == null || eventUrl.isEmpty()) {
             createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "subscription.validation.param.url"), OK, null)
@@ -119,10 +139,15 @@ class SubscriptionController extends RestfulController {
         return true
     }
 
-    private def parseResponseInSubscription = {Token token, eventUrl ->
+    private def parseResponseInSubscription = {Token requestToken, eventUrl, oAuthSignature ->
         /*PARSING process*/
 
-        def response = oauthService.getAppdirectResource(token, eventUrl)
+        Response response = oauthService.getAppdirectResource(requestToken, eventUrl)
+
+        if (!TEST_MODE) {
+            /*Take a look in the implementation to get the token response, it throws a UnknownHostException*/
+            validateResponse(response, requestToken, oAuthSignature)
+        }
 
         String responseAsXmlText = response.getBody()
 
@@ -191,9 +216,27 @@ class SubscriptionController extends RestfulController {
         subscription.marketplace = marketplace
         subscription.company = company
         subscription.order = order
+        subscription.flag = eventNode.flag.text()
 
         return subscription
 
+    }
+
+    private validateResponse = {Response response, Token requestToken, oAuthSignature ->
+        Verifier verifier = new Verifier(oAuthSignature as String)
+
+        /*TODO get from config*/
+        final String providerName = "appdirect"
+
+        Token accessToken = oauthService.getAccessToken(providerName, requestToken, verifier)
+        println "accessToken: $accessToken"
+        if (accessToken.isEmpty()) {
+            createResult(false, ErrorCode.UNAUTHORIZED, message(code: "oauth.unauthorized"), UNAUTHORIZED, null)
+        }
+
+        if (!response.isSuccessful()) {
+            createResult(false, ErrorCode.INVALID_RESPONSE, message(code: "oauth.response.invalid"), NO_CONTENT, null)
+        }
     }
 
     private def createResult = {success, errorCode, message, status, accountIdentifier ->

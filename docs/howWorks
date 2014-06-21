@@ -9,6 +9,6 @@
 
     Error codes:
         -UNAUTHORIZED: This error code is returned when users try any action that is not authorized for that particular application. For example, if an application does not allow the original creator to be unassigned.
-        -CONFIGURATION_ERROR: This error code is returned when the vendor endpoint is not currently configured.
+        -CONFIGURATION_ERROR: This error code is returned when the vendor endpoint is not currently configured. Note: This is managed by the OAuth plugin, we need to catch the exception may be to handle this code.
         -INVALID_RESPONSE: This error code is returned when the vendor was unable to process the event fetched from AppDirect.
         -UNKNOWN_ERROR: This error code may be used when none of the other error codes apply.

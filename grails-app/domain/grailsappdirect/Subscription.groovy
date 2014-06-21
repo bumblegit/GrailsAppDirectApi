@@ -12,6 +12,7 @@ class Subscription {
     Account account
     Creator creator
     Notice notice
+    String flag
 
     static hasOne = [creator: Creator]
     static hasMany = [users: User]
@@ -28,6 +29,7 @@ class Subscription {
         account nullable: true
         users nullable: true
         notice nullable: true, inList: Notice.values().toList()
+        flag nullable: true, blank: true
     }
 
     String toString() {

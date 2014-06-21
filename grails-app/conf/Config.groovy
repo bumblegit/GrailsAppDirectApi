@@ -121,8 +121,8 @@ oauth {
     providers {
         appdirect {
             api = AppDirectApi
-            key = 'Dummy'
-            secret = 'secret'
+            key = 'grailsappdirecttest-10097'
+            secret = 'pqJ2XVYx338thtHN'
         }
     }
 }
