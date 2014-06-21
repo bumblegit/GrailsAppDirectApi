@@ -3,16 +3,18 @@ package grailsappdirect
 import grails.converters.XML
 import grails.rest.RestfulController
 import grails.transaction.Transactional
-import org.codehaus.groovy.grails.plugins.codecs.HTMLCodec
-
-import static org.springframework.http.HttpStatus.*
 import org.scribe.model.Token
 import uk.co.desirableobjects.oauth.scribe.OauthService
 
+import static org.springframework.http.HttpStatus.NOT_FOUND
+import static org.springframework.http.HttpStatus.OK
+
 @Transactional(readOnly = true)
-class SubscriptionController extends RestfulController{
+class SubscriptionController extends RestfulController {
 
     static allowedMethods = [save: "POST", update: "PUT", delete: "DELETE"]
+
+    final String URL_ENCODING = "UTF-8"
 
     OauthService oauthService
 
@@ -21,86 +23,111 @@ class SubscriptionController extends RestfulController{
     }
 
     def index(Integer max) {
-        println "WS Index!!"
         params.max = Math.min(max ?: 10, 100)
         respond Subscription.list(params), model: [subscriptionInstanceCount: Subscription.count()]
     }
 
-    //Take in mind code 200
     def show(Subscription subscriptionInstance) {
         respond subscriptionInstance
     }
 
     /*
-    URL's
-    In AppDirect configuration:
-        http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl={eventUrl}
-    In GrailsAppDirect
-        http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyOrder
-
-    Error codes for order subscriptions:
-        -UNAUTHORIZED: This error code is returned when users try any action that is not authorized for that particular application. For example, if an application does not allow the original creator to be unassigned.
-        -(*)CONFIGURATION_ERROR: This error code is returned when the vendor endpoint is not currently configured.
-        -INVALID_RESPONSE: This error code is returned when the vendor was unable to process the event fetched from AppDirect.
-        -UNKNOWN_ERROR: This error code may be used when none of the other error codes apply.
-
-        * Not implemented yet
-    * */
-
-    /*
-    Test for action:
     curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST -d "" http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyOrder
     */
 
     @Transactional
     def save() {
-        println "WS Create!!!"
 
-        /* URL Implementation */
+        println message(code: "subscription.creating")
 
-        String eventUrlEncode
+        boolean isValidURLEvent = validateEventUrl(params.eventUrl)
+        if (!isValidURLEvent) {return}
 
-        eventUrlEncode = params.eventUrl
-
-        if (eventUrlEncode == null || eventUrlEncode.isEmpty()) {
-            Result result = new Result()
-            result.success = false
-            result.errorCode = ErrorCode.UNKNOWN_ERROR
-            result.message = "Subscription NOT created!. eventUrl param is empty or null"
-            respond result, [status: OK]
-            request.withFormat {
-                xml { render result as XML }
-            }
-            return
-        }
-
-        String eventUrl = URLDecoder.decode(eventUrlEncode, "UTF-8")
+        String eventUrl = URLDecoder.decode(params.eventUrl as String, URL_ENCODING)
         println "eventUrlDecoded: $eventUrl"
 
+        Token token = getToken(eventUrl)
+
+        Subscription subscription = parseResponseInSubscription(token, eventUrl)
+
+        boolean isValidSubscriptionBuilt = validateSubscriptionBuilt as boolean
+        if (!isValidSubscriptionBuilt) {return}
+
+        println subscription
+
+        boolean subscriptionSaved = subscription.save(flush: true, failOnError:true) as boolean
+
+        if (subscriptionSaved) {
+            String accountIdentifier = subscription.company.uuid
+            createResult(true, null, message(code: "subscription.validation.created"), OK, accountIdentifier)
+        } else {
+            createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "subscription.validation.not.created"), OK, null)
+        }
+    }
+
+    /*
+    curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/subscriptions/6
+    */
+
+    @Transactional
+    def delete(Subscription subscriptionInstance) {
+        println message(code: "subscription.deleting")
+
+        if (subscriptionInstance == null) {
+            respond subscriptionInstance, [status: NOT_FOUND]
+        }
+
+        subscriptionInstance?.delete(flush: true, failOnError:true)
+        boolean subscriptionDeleted = subscriptionInstance?.id != null && !subscriptionInstance?.exists(subscriptionInstance?.id)
+
+        if (subscriptionDeleted) {
+            //We are going to use the company's UUID as accountIdentifier. We will have it available for future events
+            createResult(true, null, message(code: "subscription.validation.deleted"), OK, subscriptionInstance?.company?.uuid)
+        } else {
+            createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "subscription.validation.not.deleted"), OK, subscriptionInstance?.company?.uuid)
+        }
+    }
+
+    private def validateSubscriptionBuilt = {subscription ->
+        if (subscription == null || subscription.hasErrors()) {
+            createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "subscription.validation.not.created"), OK, null)
+        }
+    }
+
+    private def getToken = {eventUrl ->
         final String tokenLastMarkReplacement = "/"
         final String tokenEmptyMarkReplacement = ""
 
-        /*TODO use this option after implement the encoding convention for the URL
-        * tokenLastMarkReplacement = "2F"
-        * */
+        String tokenStr = eventUrl.reverse().find('\\w+')?.reverse()?.replace(tokenLastMarkReplacement, tokenEmptyMarkReplacement)
 
-        def tokenStr = eventUrl.reverse().find('\\w+').reverse().replace(tokenLastMarkReplacement, tokenEmptyMarkReplacement)
         println "tokenStr: $tokenStr"
 
-        /*TODO remove secret?, it's already on config and is for provider, not for token*/
-        Token token = new Token(tokenStr, "secret")
+        /*The OAuth plugin already validate the configuration*/
+        def oauthConfig = grailsApplication.config.oauth
+        String secret = oauthConfig?.providers?.appdirect?.secret
 
-        /*TODO if is not a valid authorization, then return SC_UNAUTHORIZED(401) respond*/
-        /*Authorization and response*/
+        Token token = new Token(tokenStr, secret)
+
+        return token
+    }
+
+    private def validateEventUrl = {eventUrl ->
+        if (eventUrl == null || eventUrl.isEmpty()) {
+            createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "subscription.validation.param.url"), OK, null)
+            return false
+        }
+        return true
+    }
+
+    private def parseResponseInSubscription = {Token token, eventUrl ->
+        /*PARSING process*/
 
         def response = oauthService.getAppdirectResource(token, eventUrl)
 
         String responseAsXmlText = response.getBody()
 
-        /*PARSING process*/
-
         /* First XML Level */
-        def eventNode = new XmlParser().parseText(responseAsXmlText)
+        def eventNode = new XmlParser().parseText(responseAsXmlText as String)
         def creatorNode = eventNode.creator
         def marketplaceNode = eventNode.marketplace
         def payloadNode = eventNode.payload
@@ -165,184 +192,21 @@ class SubscriptionController extends RestfulController{
         subscription.company = company
         subscription.order = order
 
-        /* Result creation */
+        return subscription
+
+    }
+
+    private def createResult = {success, errorCode, message, status, accountIdentifier ->
         Result result = new Result()
-
-        /*TODO adapt with the real subscription*/
-        if (subscription == null || subscription.hasErrors()) {
-            result.success = false
-            result.errorCode = ErrorCode.UNKNOWN_ERROR
-            result.message = "Subscription NOT created!"
-        }
-
-        /*Prints for subscription built */
-        println "create - subscription: "
-        println " -marketplace: "+subscription.marketplace.partner
-        println " -creator: "+subscription.creator.firstName+" "+subscription.creator.lastName
-        println " -company: "+subscription.company.name
-        println " -Order: $subscription.order.editionCode"
-        subscription.order.items.each {
-            println "   -item-unit: $it.unit"
-            println "   -item-quantity: $it.quantity"
-            println "----------"
-        }
-
-        boolean subscriptionSaved = subscription.save(flush: true, failOnError:true) as boolean;
-
-        if (subscriptionSaved) {
-            result.success = true
-            result.errorCode = null
-            //We are going to use the company's UUID as accountIdentifier. We will have it available for future events
-            result.accountIdentifier = subscription.company.uuid
-            result.message = "Subscription CREATED!"
-            //Respond with code 200
-            respond result, [status: OK]
-        } else {
-            result.success = false
-            result.errorCode = 300
-            result.message = "Subscription NOT created!"
-            respond result, [status: OK]
-            /*According to AppDirect documentation, we should always return a HTTPStatus 200
-            * The differences are in the errorCode
-            * */
-        }
-
-        println " Result: "
-        println "  -success: "+result.success
-        println "  -errorCode: "+result.errorCode
-        println "  -message: "+result.message
-
-        /*XML response for AppDirect*/
+        result.success = success
+        result.errorCode = errorCode
+        result.message = message
+        result.accountIdentifier = accountIdentifier
+        respond result, [status: status]
         request.withFormat {
             xml { render result as XML }
         }
-        respond result, [status: OK]
-
+        println result
     }
 
-    //curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/subscriptions/6
-    //Take in mind code 200
-    @Transactional
-    def delete(Subscription subscriptionInstance) {
-        println "WS Delete!!"
-
-        /* Result creation */
-        Result result = new Result()
-
-        if (subscriptionInstance == null) {
-            respond subscriptionInstance, [status: NOT_FOUND]
-        }
-
-        boolean subscriptionDeleted = subscriptionInstance.delete(flush: true, failOnError:true) as boolean;
-
-        if (subscriptionDeleted) {
-            result.success = true
-            result.errorCode = null
-            //We are going to use the company's UUID as accountIdentifier. We will have it available for future events
-            result.accountIdentifier = subscription.company.uuid
-            result.message = "Subscription DELETED!"
-            //Respond with code 200
-            respond result, [status: OK]
-        } else {
-            result.success = false
-            result.errorCode = 300
-            result.message = "Subscription NOT deleted!"
-            respond result, [status: OK]
-            /*According to AppDirect documentation, we should always return a HTTPStatus 200
-            * The differences are in the errorCode
-            * */
-        }
-
-        request.withFormat {
-            xml { render subscriptionInstance as XML }
-        }
-    }
-
-    /*TEST DATA*/
-
-    /*Creation of Marketplace test data*/
-    def buildMarketplace = {
-
-        Marketplace marketplace = new Marketplace();
-        marketplace.baseUrl = "https://acme.appdirect.com";
-        marketplace.partner = "ACME"
-
-        return  marketplace
-    }
-
-    /*Creation of User Creator test data*/
-    def buildCreator = {
-
-        Creator creator = new Creator();
-        creator.firstName = "Walter"
-        creator.lastName = "Hernandez"
-        creator.openId = "https://plus.google.com/+WalterHernandez-id"
-        creator.email = "walhernandez@gmail.com"
-        creator.lang = "SP"
-        creator.uuid = "a11a7918-bb43-4429-a256-f6d729c71033"
-
-        return creator
-    }
-
-    /*Creation of Company test data*/
-    def buildCompany = {
-
-        Company company = new Company()
-        company.name = "JCor"
-        company.email = "support@jcor.com.ar"
-        company.phoneNumber = "3512465522"
-        company.website = "www.jcor.com.ar"
-        company.uuid = "d15bb36e-5fb5-11e0-8c3c-00262d2cda03"
-
-        return company
-    }
-
-    /*Creation of Account test data*/
-    def buildAccount = {
-
-        Account account = new Account()
-        //At this point, we don't have an account identifier. We will have one for the future events
-        account.identifier = ""
-        account.status = AccountStatus.ACTIVE
-
-        return account
-    }
-
-    /*Creation of Users test data*/
-    def buildUsers = {subscriptions ->
-
-        def users = []
-
-        User user1 = new User();
-        user1.firstName = "JCor User1 FirstName"
-        user1.lastName = "JCor User1 LastName"
-        user1.openId = "https://jcor.com.ar/id1"
-        user1.subscriptionUser = subscriptions.get(0)
-
-        User user2 = new User();
-        user2.firstName = "JCor User2 FirstName"
-        user2.lastName = "JCor User2 LastName"
-        user2.openId = "https://jcor.com.ar/id2"
-        user2.subscriptionUser = subscriptions.get(0)
-
-        users.add(user1)
-        users.add(user2)
-
-        return users
-    }
-
-    /*Creation of Subscription test data*/
-    def buildSubscription = {marketplace, account, company, creator, users, subscription ->
-
-        subscription.subscriptionType = SubscriptionType.SUBSCRIPTION_ORDER
-        subscription.marketplace = marketplace
-        subscription.account = account
-        subscription.company = company
-        subscription.creator = creator
-        users.each {
-            subscription.addToUsers(it)
-        }
-
-        return subscription
-    }
 }
