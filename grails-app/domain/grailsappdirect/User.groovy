@@ -4,6 +4,7 @@ class User {
 
     static belongsTo = [subscriptionUser: Subscription]
 
+    EventType eventType
     String firstName
     String lastName
     String lang
@@ -13,6 +14,7 @@ class User {
     Profile profile
 
     static constraints = {
+        eventType nullable: false, blank: false
         firstName blank: false, nullable: false
         lastName blank: false, nullable: false
         email email: true, unique: true, nullable: true

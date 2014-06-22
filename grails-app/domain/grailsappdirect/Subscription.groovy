@@ -5,7 +5,7 @@ import grails.rest.Resource
 @Resource
 class Subscription {
 
-    SubscriptionType subscriptionType
+    EventType eventType
     Marketplace marketplace
     Company company
     Order order
@@ -14,13 +14,13 @@ class Subscription {
     Notice notice
     String flag
 
-    static hasOne = [creator: Creator]
+    static hasOne = [creator: Creator, account: Account, company: Company, marketplace: Marketplace]
     static hasMany = [users: User]
 
     static mappedBy = [user: "subscriptionUser", creator: "subscriptionCreator"]
 
     static constraints = {
-        subscriptionType nullable: false, blank: false
+        eventType nullable: false, blank: false
         marketplace nullable: false
         creator nullable: false
         company nullable: true

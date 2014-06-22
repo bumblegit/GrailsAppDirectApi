@@ -11,7 +11,7 @@ import uk.co.desirableobjects.oauth.scribe.OauthService
 import static org.springframework.http.HttpStatus.*
 
 @Transactional(readOnly = true)
-class SubscriptionController extends RestfulController {
+class UserController extends RestfulController {
 
     static allowedMethods = [save: "POST", update: "PUT", delete: "DELETE"]
 
@@ -21,26 +21,27 @@ class SubscriptionController extends RestfulController {
 
     OauthService oauthService
 
-    SubscriptionController() {
+    UserController() {
         super(Subscription)
     }
 
     /*
-curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST -d "" http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyOrder
+curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST -d "" http://localhost:8080/GrailsAppDirectApi/api/users?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyAssign
     */
 
     @Transactional
     def save() {
 
-        log.info message(code: "subscription.creating")
+        log.info message(code: "user.assigning")
+        println message(code: "user.assigning")
 
-        boolean isValidURLEvent = validateEventUrl(params.eventUrl, EventType.SUBSCRIPTION_ORDER)
+        boolean isValidURLEvent = validateEventUrl(params.eventUrl, EventType.USER_ASSIGNMENT)
         if (!isValidURLEvent) {return}
 
         String eventUrl = URLDecoder.decode(params.eventUrl as String, URL_ENCODING)
         log.info "eventUrlDecoded: $eventUrl"
 
-        /*TODO implement STATELESS for dummy orders:
+        /*TODO implement STATELESS for dummy user assignments:
         *
         * http://info.appdirect.com/developers/docs/publication_and_maintenance/api_uptime_monitoring
         *
@@ -52,44 +53,43 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
         boolean isValidResponse = validateResponse(response)
         if (!isValidResponse) {return}
 
-        Subscription subscription = parseResponseInSubscription(response)
+        User user = parseResponseInUserAssignment(response)
 
-        boolean isValidSubscriptionBuilt = validateSubscriptionBuilt(subscription)
-        if (!isValidSubscriptionBuilt) {return}
+        boolean isValidUserBuilt = validateSubscriptionBuilt(user)
+        if (!isValidUserBuilt) {return}
 
-        log.info(subscription)
+        println user
+        log.info(user)
 
-        boolean subscriptionSaved = subscription.save(true) as boolean
+        boolean userSaved = user.save(flush: true, failOnError: true) as boolean
 
-        if (subscriptionSaved) {
-            println "what?"
-            String accountIdentifier = subscription.company.uuid
-            createResult(true, null, message(code: "subscription.validation.created"), OK, accountIdentifier)
+        if (userSaved) {
+            println "user.subscriptionUser: "+user.subscriptionUser
+            createResult(true, null, message(code: "user.validation.assigned"), OK, user.subscriptionUser.account.identifier)
         } else {
-            createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "subscription.validation.not.created"), OK, null)
+            createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "user.validation.not.assigned"), OK, null)
         }
     }
 
     /*
-curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/subscriptions/6
-    */
+curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
+  */
 
     @Transactional
-    def delete(Subscription subscriptionInstance) {
-        log.info message(code: "subscription.deleting")
+    def delete(User userInstance) {
+        log.info message(code: "user.deleting")
 
-        if (subscriptionInstance == null) {
-            respond subscriptionInstance, [status: NOT_FOUND]
+        if (userInstance == null) {
+            respond userInstance, [status: NOT_FOUND]
         }
 
-        subscriptionInstance?.delete(flush: true, failOnError:true)
-        boolean subscriptionDeleted = subscriptionInstance?.id != null && !subscriptionInstance?.exists(subscriptionInstance?.id)
+        userInstance?.delete(flush: true, failOnError:true)
+        boolean userDeleted = userInstance?.id != null && !userInstance?.exists(userInstance?.id)
 
-        if (subscriptionDeleted) {
-            //We are going to use the company's UUID as accountIdentifier. We will have it available for future events
-            createResult(true, null, message(code: "subscription.validation.deleted"), OK, subscriptionInstance?.company?.uuid)
+        if (userDeleted) {
+            createResult(true, null, message(code: "user.validation.deleted"), OK, userInstance?.subscriptionUser?.company?.uuid)
         } else {
-            createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "subscription.validation.not.deleted"), OK, subscriptionInstance?.company?.uuid)
+            createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "user.validation.not.deleted"), OK, userInstance?.subscriptionUser?.company?.uuid)
         }
     }
 
@@ -132,7 +132,7 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/subscriptions/6
         return true
     }
 
-    private def parseResponseInSubscription = {response ->
+    private def parseResponseInUserAssignment = {response ->
         /*PARSING process*/
 
         String responseAsXmlText = response.getBody()
@@ -140,72 +140,58 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/subscriptions/6
         /* First XML Level */
         def eventNode = new XmlParser().parseText(responseAsXmlText as String)
         def creatorNode = eventNode.creator
-        def marketplaceNode = eventNode.marketplace
-        def payloadNode = eventNode.payload
-        def companyNode = payloadNode.company
-        def orderNode = payloadNode.order
-        //def returnUrlNode = eventNode.returnUrl
+        def accountNode = eventNode.payload.account
+        def userNode = eventNode.payload.user
         def typeNode = eventNode.type
 
-        /*** Subscription ***/
+        /*** User ***/
 
-        Subscription subscription = new Subscription()
+        User user = new User()
         String typeNodeText = typeNode.text()
-        subscription.eventType = EventType.valueOf(typeNodeText)
+        user.eventType = EventType.valueOf(typeNodeText)
 
-        /*** Creator ***/
-
-        Creator creator = new Creator()
-        creator.email = creatorNode.email.text()
-        creator.firstName = creatorNode.firstName.text()
-        creator.lastName = creatorNode.lastName.text()
-        creator.lang = creatorNode.language.text()
-        creator.openId = creatorNode.openId.text()
-        creator.uuid = creatorNode.uuid.text()
-        creator.subscriptionCreator = subscription
-
-        /*** Marketplace ***/
-
-        Marketplace marketplace = new Marketplace()
-        marketplace.partner = marketplaceNode.partner.text()
-        marketplace.baseUrl = marketplaceNode.baseUrl.text()
-        marketplace.subscription = subscription
+        String uuid = creatorNode.uuid.text()
+        println "uuid: $uuid"
+        Creator creator = Creator.findByUuid(uuid)
+        boolean creatorExists = validateCreatorExists(creator)
+        if (!creatorExists) {return}
+        Subscription subscription = creator.subscriptionCreator
 
         /*** Payload ***/
 
-        //Company
-        Company company = new Company()
-        company.country = companyNode.country.text()
-        company.email = companyNode.email.text()
-        company.name = companyNode.name.text()
-        company.uuid = companyNode.uuid.text()
-        company.phoneNumber = companyNode.phoneNumber.text()
-        company.website = companyNode.website.text()
-        company.subscription = subscription
+        //Account
+        Account account = new Account()
+        account.identifier = accountNode.accountIdentifier.text()
+        account.status = accountNode.status.text()
+        account.subscription = subscription
 
-        //Order
-        Order order = new Order()
-        order.editionCode = orderNode.editionCode.text()
-        order.pricingDuration = orderNode.pricingDuration.text()
-        orderNode.item.findAll {
-            OrderItem item = new OrderItem()
-            item.quantity = it.quantity.text() as Integer
-            item.unit = it.unit.text()
-            item.order = order
-            order.addToItems(item)
-        }
-        order.subscription = subscription
+        /*** User ***/
+
+        user.email = userNode.email.text()
+        user.firstName = userNode.firstName.text()
+        user.lastName = userNode.lastName.text()
+        user.lang = userNode.language.text()
+        user.openId = userNode.openId.text()
+        user.uuid = userNode.uuid.text()
+        user.subscriptionUser = subscription
 
         /*** Subscription assignments***/
 
-        subscription.creator = creator
-        subscription.marketplace = marketplace
-        subscription.company = company
-        subscription.order = order
         subscription.flag = eventNode.flag.text()
+        subscription.account = account
+        subscription.addToUsers(user)
 
-        return subscription
+        return user
 
+    }
+
+    def validateCreatorExists = {creator ->
+        if (creator == null) {
+            String paramMsg = message(code: "user.validation.not.assigned")
+            createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "user.validation.creator.exists", args: [paramMsg]), OK, null)
+            return false
+        }
+        return true
     }
 
     private validateResponse = {response ->

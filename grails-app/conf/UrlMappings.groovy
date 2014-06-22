@@ -11,5 +11,7 @@ class UrlMappings {
         "500"(view:'/error')
         "/api/subscriptions" (resources: 'subscription')
         "/api/subscriptions/*" (resources: 'subscription/*')
+        "/api/users" (resources: 'user')
+        "/api/users/*" (resources: 'user/*')
 	}
 }

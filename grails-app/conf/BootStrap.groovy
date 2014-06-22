@@ -166,7 +166,7 @@ class BootStrap {
     def buildSubscriptions = {marketplaces, accounts, companies, creators, users, subscriptions ->
 
         Subscription subscription1 = subscriptions.get(0)
-        subscription1.subscriptionType = SubscriptionType.SUBSCRIPTION_ORDER
+        subscription1.eventType = EventType.SUBSCRIPTION_ORDER
         subscription1.marketplace = marketplaces.get(0)
         subscription1.account = accounts.get(0)
         subscription1.company = companies.get(0)
@@ -175,7 +175,7 @@ class BootStrap {
         subscription1.addToUsers(users.get(1))
 
         Subscription subscription2 = subscriptions.get(1)
-        subscription2.subscriptionType = SubscriptionType.SUBSCRIPTION_ORDER
+        subscription2.eventType = EventType.SUBSCRIPTION_ORDER
         subscription2.marketplace = marketplaces.get(1)
         subscription2.account = accounts.get(1)
         subscription2.company = companies.get(1)
