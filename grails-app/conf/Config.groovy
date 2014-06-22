@@ -97,15 +97,15 @@ environments {
 
 // log4j configuration
 log4j.main = {
-    info 'grails.app.controller'
+    info 'grails.app'
     error  'grails.app'
     appenders {
-        file name:'restService', file:'target/logs/restService.log'
+        file name:'restService', file:'target/logs/service.log'
     }
 
     root{
-        info()
-        error()
+        info 'stdout', 'restService'
+        error 'stdout', 'restService'
         additivity = true
     }
 
