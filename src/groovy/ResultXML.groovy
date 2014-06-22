@@ -1,6 +1,6 @@
 package grailsappdirect
 
-class Result {
+class ResultXML {
 
     boolean success
     String errorCode

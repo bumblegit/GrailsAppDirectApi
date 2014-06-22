@@ -96,19 +96,36 @@ environments {
 }
 
 // log4j configuration
-log4j.main = {
-    info 'grails.app.controller'
-    error  'grails.app'
+log4j = {
     appenders {
-        file name:'restService', file:'target/logs/restService.log'
+
+        console name: 'stdout', layout: pattern(conversionPattern: '%d{dd-MM-yyyy HH:mm:ss} %-5p [%c{2}] %m%n')
+        environments {
+            development {
+                rollingFile name:'grailsAppDirectAppender', fileName: "grailsAppDirect", file: "target/logs/grailsAppDirect.log", append: true,
+                        layout: pattern(conversionPattern: '%d{dd-MM-yyyy HH:mm:ss} %-5p [%c{2}] %m%n')
+            }
+            production {
+                rollingFile name:'grailsAppDirectAppender', file: "/usr/local/tomcat/logs/grailsAppDirect.log", append: true,
+                        maxBackupIndex: 10, maxFileSize: "10MB",
+                        layout: pattern(conversionPattern: '%d{dd-MM-yyyy HH:mm:ss} %-5p [%c{2}] %m%n')
+            }
+        }
     }
 
-    root{
-        info()
-        error()
-        additivity = true
-    }
+    info grailsAppDirectAppender:'grailsAppDirect', additivity:false
 
+    error  'org.codehaus.groovy.grails.web.servlet',        // controllers
+            'org.codehaus.groovy.grails.web.pages',          // GSP
+            'org.codehaus.groovy.grails.web.sitemesh',       // layouts
+            'org.codehaus.groovy.grails.web.mapping.filter', // URL mapping
+            'org.codehaus.groovy.grails.web.mapping',        // URL mapping
+            'org.codehaus.groovy.grails.commons',            // core / classloading
+            'org.codehaus.groovy.grails.plugins',            // plugins
+            'org.codehaus.groovy.grails.orm.hibernate',      // hibernate integration
+            'org.springframework',
+            'org.hibernate',
+            'net.sf.ehcache.hibernate'
 }
 
 /*OAuth configuration*/

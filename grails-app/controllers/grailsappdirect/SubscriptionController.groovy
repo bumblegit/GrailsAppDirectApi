@@ -15,7 +15,7 @@ class SubscriptionController extends RestfulController {
 
     static allowedMethods = [save: "POST", update: "PUT", delete: "DELETE"]
 
-    private static final log = LogFactory.getLog("restService")
+    private static final log = LogFactory.getLog("grailsAppDirect."+this.getName())
 
     final String URL_ENCODING = "UTF-8"
 
@@ -220,7 +220,7 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/subscriptions/6
     }
 
     private def createResult = {success, errorCode, message, status, accountIdentifier ->
-        Result result = new Result()
+        ResultXML result = new ResultXML()
         result.success = success
         result.errorCode = errorCode
         result.message = message
@@ -232,7 +232,7 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/subscriptions/6
         if (success) {
             log.info result
         } else {
-            log.error result
+            log.warn result
         }
     }
 

@@ -15,7 +15,7 @@ class UserController extends RestfulController {
 
     static allowedMethods = [save: "POST", update: "PUT", delete: "DELETE"]
 
-    private static final log = LogFactory.getLog("restService")
+    private static final log = LogFactory.getLog("grailsAppDirect."+this.getName())
 
     final String URL_ENCODING = "UTF-8"
 
@@ -151,10 +151,12 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
         String typeNodeText = typeNode.text()
         user.eventType = EventType.valueOf(typeNodeText)
 
-        String uuid = creatorNode.uuid.text()
-        println "uuid: $uuid"
-        Creator creator = Creator.findByUuid(uuid)
-        boolean creatorExists = validateCreatorExists(creator)
+        boolean userExists = validateUserExists(userNode.uuid.text() as String)
+        if (userExists) {return}
+
+        String uuidCreator = creatorNode.uuid.text()
+        Creator creator = Creator.findByUuid(uuidCreator)
+        boolean creatorExists = validateCreatorExists(uuidCreator)
         if (!creatorExists) {return}
         Subscription subscription = creator.subscriptionCreator
 
@@ -190,13 +192,23 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
 
     }
 
-    def validateCreatorExists = {creator ->
+    def validateCreatorExists = {String uuid ->
         if (creator == null) {
             String paramMsg = message(code: "user.validation.not.assigned")
             createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "user.validation.creator.exists", args: [paramMsg]), OK, null)
             return false
         }
         return true
+    }
+
+    def validateUserExists = { String uuid ->
+        User user = User.findByUuid(uuid)
+        if (user != null) {
+            String paramMsg = message(code: "user.validation.not.assigned")
+            createResult(false, ErrorCode.USER_ALREADY_EXISTS, message(code: "user.validation.exists", args: [paramMsg]), OK, null)
+            return true
+        }
+        return false
     }
 
     private validateResponse = {response ->
@@ -212,7 +224,7 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
     }
 
     private def createResult = {success, errorCode, message, status, accountIdentifier ->
-        Result result = new Result()
+        ResultXML result = new ResultXML()
         result.success = success
         result.errorCode = errorCode
         result.message = message
@@ -224,7 +236,7 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
         if (success) {
             log.info result
         } else {
-            log.error result
+            log.warn result
         }
     }
 
