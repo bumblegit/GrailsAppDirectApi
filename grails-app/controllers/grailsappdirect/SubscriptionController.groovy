@@ -62,7 +62,6 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
         boolean subscriptionSaved = subscription.save(true) as boolean
 
         if (subscriptionSaved) {
-            println "what?"
             String accountIdentifier = subscription.company.uuid
             createResult(true, null, message(code: "subscription.validation.created"), OK, accountIdentifier)
         } else {
@@ -230,7 +229,7 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/subscriptions/6
         request.withFormat {
             xml { render result as XML }
         }
-        if (result.errorCode != null) {
+        if (success) {
             log.info result
         } else {
             log.error result

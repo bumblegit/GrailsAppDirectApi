@@ -73,7 +73,8 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
 
     /*
 curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
-  */
+?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyUnassign
+/*TODO I need to figure out how map the unassign user event*/
 
     @Transactional
     def delete(User userInstance) {
@@ -103,20 +104,20 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
 
     private def getRequestToken = {eventUrl ->
         final String tokenLastMarkReplacement = "/"
-        final String tokenEmptyMarkReplacement = ""
+    final String tokenEmptyMarkReplacement = ""
 
-        String tokenStr = eventUrl.reverse().find('\\w+')?.reverse()?.replace(tokenLastMarkReplacement, tokenEmptyMarkReplacement)
+    String tokenStr = eventUrl.reverse().find('\\w+')?.reverse()?.replace(tokenLastMarkReplacement, tokenEmptyMarkReplacement)
 
-        log.info "tokenStr: $tokenStr"
+    log.info "tokenStr: $tokenStr"
 
-        /*The OAuth plugin already validate the configuration*/
-        def oauthConfig = grailsApplication.config.oauth
-        String secret = oauthConfig?.providers?.appdirect?.secret
+    /*The OAuth plugin already validate the configuration*/
+    def oauthConfig = grailsApplication.config.oauth
+    String secret = oauthConfig?.providers?.appdirect?.secret
 
-        Token token = new Token(tokenStr, secret)
+    Token token = new Token(tokenStr, secret)
 
-        return token
-    }
+    return token
+}
 
     private def validateEventUrl = {eventUrl, EventType eventType ->
         if (eventUrl == null || eventUrl.isEmpty()) {
@@ -160,10 +161,15 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
         /*** Payload ***/
 
         //Account
-        Account account = new Account()
-        account.identifier = accountNode.accountIdentifier.text()
-        account.status = accountNode.status.text()
-        account.subscription = subscription
+
+        /*this is just for do a undo to the event comming for dommuyOrder. I mean, this action allow to delete an user and NOT delete de account*/
+        if (subscription.account == null || !Account.exists(subscription.account.id)) {
+            Account account = new Account()
+            account.identifier = accountNode.accountIdentifier.text()
+            account.status = accountNode.status.text()
+            account.subscription = subscription
+            subscription.account = account
+        }
 
         /*** User ***/
 
@@ -178,7 +184,6 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
         /*** Subscription assignments***/
 
         subscription.flag = eventNode.flag.text()
-        subscription.account = account
         subscription.addToUsers(user)
 
         return user
@@ -216,7 +221,7 @@ curl -i -X DELETE http://localhost:8080/GrailsAppDirectApi/api/users/6
         request.withFormat {
             xml { render result as XML }
         }
-        if (result.errorCode != null) {
+        if (success) {
             log.info result
         } else {
             log.error result
