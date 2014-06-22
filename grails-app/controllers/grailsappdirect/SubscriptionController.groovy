@@ -3,10 +3,9 @@ package grailsappdirect
 import grails.converters.XML
 import grails.rest.RestfulController
 import grails.transaction.Transactional
-import groovyx.net.http.URIBuilder
+import org.apache.commons.logging.LogFactory
 import org.scribe.model.Response
 import org.scribe.model.Token
-import org.scribe.model.Verifier
 import uk.co.desirableobjects.oauth.scribe.OauthService
 
 import static org.springframework.http.HttpStatus.*
@@ -16,8 +15,9 @@ class SubscriptionController extends RestfulController {
 
     static allowedMethods = [save: "POST", update: "PUT", delete: "DELETE"]
 
+    private static final log = LogFactory.getLog("restService")
+
     final String URL_ENCODING = "UTF-8"
-    final boolean TEST_MODE = true
 
     OauthService oauthService
 
@@ -35,18 +35,19 @@ class SubscriptionController extends RestfulController {
     }
 
     /*
-curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST -d "" http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyOrder%3Foauth_signature%3DIBlWhOm3PuDwaSdxE%2FQu4RKPtVE%3D    */
+    curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST -d "" http://localhost:8080/GrailsAppDirectApi/api/subscriptions?eventUrl=https%3A%2F%2Fwww.appdirect.com%2FAppDirect%2Frest%2Fapi%2Fevents%2FdummyOrder
+    */
 
     @Transactional
     def save() {
 
-        println message(code: "subscription.creating")
+        log.info message(code: "subscription.creating")
 
         boolean isValidURLEvent = validateEventUrl(params.eventUrl)
         if (!isValidURLEvent) {return}
 
         String eventUrl = URLDecoder.decode(params.eventUrl as String, URL_ENCODING)
-        println "eventUrlDecoded: $eventUrl"
+        log.info "eventUrlDecoded: $eventUrl"
 
         /*TODO implement STATELESS for dummy orders:
         *
@@ -54,17 +55,20 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
         *
         * */
 
-        Token requestToken = getRequestToken(eventUrl)
-        String oAuthSignature = getOAuthSignature(eventUrl)
+        Token token = getRequestToken(eventUrl)
 
-        Subscription subscription = parseResponseInSubscription(requestToken, eventUrl, oAuthSignature)
+        Response response = oauthService.getAppdirectResource(token, eventUrl)
+        boolean isValidResponse = validateResponse(response)
+        if (!isValidResponse) {return}
 
-        boolean isValidSubscriptionBuilt = validateSubscriptionBuilt as boolean
+        Subscription subscription = parseResponseInSubscription(response)
+
+        boolean isValidSubscriptionBuilt = validateSubscriptionBuilt(subscription)
         if (!isValidSubscriptionBuilt) {return}
 
-        println subscription
+        log.info(subscription)
 
-        boolean subscriptionSaved = subscription.save(flush: true, failOnError:true) as boolean
+        boolean subscriptionSaved = subscription.save(flush: true) as boolean
 
         if (subscriptionSaved) {
             String accountIdentifier = subscription.company.uuid
@@ -80,7 +84,7 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
 
     @Transactional
     def delete(Subscription subscriptionInstance) {
-        println message(code: "subscription.deleting")
+        log.info message(code: "subscription.deleting")
 
         if (subscriptionInstance == null) {
             respond subscriptionInstance, [status: NOT_FOUND]
@@ -100,7 +104,9 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
     private def validateSubscriptionBuilt = {subscription ->
         if (subscription == null || subscription.hasErrors()) {
             createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "subscription.validation.not.created"), OK, null)
+            return false
         }
+        return true
     }
 
     private def getRequestToken = {eventUrl ->
@@ -109,7 +115,7 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
 
         String tokenStr = eventUrl.reverse().find('\\w+')?.reverse()?.replace(tokenLastMarkReplacement, tokenEmptyMarkReplacement)
 
-        println "tokenStr: $tokenStr"
+        log.info "tokenStr: $tokenStr"
 
         /*The OAuth plugin already validate the configuration*/
         def oauthConfig = grailsApplication.config.oauth
@@ -120,17 +126,6 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
         return token
     }
 
-    private def getOAuthSignature = {eventUrl ->
-
-        URIBuilder uriBuilder = new URIBuilder(eventUrl as String)
-
-        String oauthSignatureParam = uriBuilder.query.oauth_signature
-
-        println "oauthSignatureParam: $oauthSignatureParam"
-
-        return oauthSignatureParam
-    }
-
     private def validateEventUrl = {eventUrl ->
         if (eventUrl == null || eventUrl.isEmpty()) {
             createResult(false, ErrorCode.UNKNOWN_ERROR, message(code: "subscription.validation.param.url"), OK, null)
@@ -139,15 +134,8 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
         return true
     }
 
-    private def parseResponseInSubscription = {Token requestToken, eventUrl, oAuthSignature ->
+    private def parseResponseInSubscription = {response ->
         /*PARSING process*/
-
-        Response response = oauthService.getAppdirectResource(requestToken, eventUrl)
-
-        if (!TEST_MODE) {
-            /*Take a look in the implementation to get the token response, it throws a UnknownHostException*/
-            validateResponse(response, requestToken, oAuthSignature)
-        }
 
         String responseAsXmlText = response.getBody()
 
@@ -222,21 +210,16 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
 
     }
 
-    private validateResponse = {Response response, Token requestToken, oAuthSignature ->
-        Verifier verifier = new Verifier(oAuthSignature as String)
-
-        /*TODO get from config*/
-        final String providerName = "appdirect"
-
-        Token accessToken = oauthService.getAccessToken(providerName, requestToken, verifier)
-        println "accessToken: $accessToken"
-        if (accessToken.isEmpty()) {
+    private validateResponse = {response ->
+        if (response == null) {
             createResult(false, ErrorCode.UNAUTHORIZED, message(code: "oauth.unauthorized"), UNAUTHORIZED, null)
+            return false
         }
-
         if (!response.isSuccessful()) {
             createResult(false, ErrorCode.INVALID_RESPONSE, message(code: "oauth.response.invalid"), NO_CONTENT, null)
+            return false
         }
+        return true
     }
 
     private def createResult = {success, errorCode, message, status, accountIdentifier ->
@@ -249,7 +232,11 @@ curl -i -H "Accept: application/xml"  -H "Content-Type: application/xml" -X POST
         request.withFormat {
             xml { render result as XML }
         }
-        println result
+        if (result.errorCode != null) {
+            log.info result
+        } else {
+            log.error result
+        }
     }
 
 }

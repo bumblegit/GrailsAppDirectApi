@@ -114,6 +114,14 @@ log4j.main = {
            'org.springframework',
            'org.hibernate',
            'net.sf.ehcache.hibernate'
+    appenders {
+        file name:'restService', file:'target/logs/restService.log'
+    }
+
+    root{
+        info 'stdout', 'restService'
+        error 'stdout', 'restService'
+    }
 }
 
 /*OAuth configuration*/
@@ -121,8 +129,8 @@ oauth {
     providers {
         appdirect {
             api = AppDirectApi
-            key = 'grailsappdirecttest-10097'
-            secret = 'pqJ2XVYx338thtHN'
+            key = 'Dummy'
+            secret = 'secret'
         }
     }
 }
