@@ -178,26 +178,11 @@
 
             <ul class="user-menu dropdown-menu-right dropdown-menu dropdown-yellow dropdown-caret dropdown-close">
                 <li>
-                    <a href="#">
-                        <i class="ace-icon fa fa-cog"></i>
-                        Settings
-                    </a>
+                    <a href="#"><strong>OpenID:</strong> <br/><openid:identifier/></a>
                 </li>
-
                 <li>
-                    <a href="profile.html">
-                        <i class="ace-icon fa fa-user"></i>
-                        Profile
-                    </a>
-                </li>
+                    <openid:logoutLink success="[controller:'login', action: '/index']"><strong>Logout</strong></openid:logoutLink>
 
-                <li class="divider"></li>
-
-                <li>
-                    <a href="#">
-                        <i class="ace-icon fa fa-power-off"></i>
-                        Logout
-                    </a>
                 </li>
             </ul>
         </li>

@@ -76,7 +76,7 @@
                     <fieldset>
                         <label class="block clearfix">
                             <span class="block input-icon input-icon-right">
-                                <openid:input class="form-control" placeholder="OpenID" size="30" value="http://" />
+                                <openid:input class="form-control" placeholder="OpenID" size="30" />
                                 <i class="ace-icon fa fa-user"></i>
                             </span>
                         </label>
